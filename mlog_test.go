@@ -2,6 +2,7 @@ package mlog
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 )
@@ -17,7 +18,9 @@ func TestTrace(t *testing.T) {
 	Error(err)
 
 	// Fatalf("fatalf log")
-	Stop()
+	if err = Stop(); err != nil {
+		fmt.Println(err)
+	}
 }
 
 func TestInfo(t *testing.T) {
@@ -31,7 +34,9 @@ func TestInfo(t *testing.T) {
 	Error(err)
 
 	// Fatalf("fatalf log")
-	Stop()
+	if err = Stop(); err != nil {
+		fmt.Println(err)
+	}
 }
 
 func TestWarning(t *testing.T) {
@@ -45,7 +50,9 @@ func TestWarning(t *testing.T) {
 	Error(err)
 
 	// Fatalf("fatalf log")
-	Stop()
+	if err = Stop(); err != nil {
+		fmt.Println(err)
+	}
 }
 
 func TestError(t *testing.T) {
@@ -59,17 +66,21 @@ func TestError(t *testing.T) {
 	Error(err)
 
 	// Fatalf("fatalf log")
-	Stop()
+	if err = Stop(); err != nil {
+		fmt.Println(err)
+	}
 }
 
 func TestStartEx(t *testing.T) {
 	path := "./test"
 	os.RemoveAll(path)
 
-	os.Mkdir(path, 0777)
+	if err := os.Mkdir(path, 0777); err != nil {
+		fmt.Println(err)
+	}
 	fileName := path + "/startex"
 
-	StartEx(LevelInfo, fileName, 10, 2)
+	StartEx(LevelInfo, fileName, 10, 2, true)
 
 	Info("Test 1")
 	Info("Test 2")
@@ -94,16 +105,24 @@ func TestStartEx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	Stop()
+	if err := Stop(); err != nil {
+		fmt.Println(err)
+	}
 
-	os.RemoveAll(path)
+	if err := os.RemoveAll(path); err != nil {
+		fmt.Println(err)
+	}
 }
 
 func TestRotatingFileHandler(t *testing.T) {
 	path := "./test_log"
-	os.RemoveAll(path)
+	if err := os.RemoveAll(path); err != nil {
+		fmt.Println(err)
+	}
 
-	os.Mkdir(path, 0777)
+	if err := os.Mkdir(path, 0777); err != nil {
+		fmt.Println(err)
+	}
 	fileName := path + "/test"
 
 	h, err := NewRotatingFileHandler(fileName, 10, 2)
@@ -113,9 +132,13 @@ func TestRotatingFileHandler(t *testing.T) {
 
 	buf := make([]byte, 10)
 
-	h.Write(buf)
+	if _, err := h.Write(buf); err != nil {
+		fmt.Println(err)
+	}
 
-	h.Write(buf)
+	if _, err := h.Write(buf); err != nil {
+		fmt.Println(err)
+	}
 
 	if _, err := os.Stat(fileName + ".1"); err != nil {
 		t.Fatal(err)
@@ -125,12 +148,16 @@ func TestRotatingFileHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h.Write(buf)
+	if _, err := h.Write(buf); err != nil {
+		fmt.Println(err)
+	}
 	if _, err := os.Stat(fileName + ".2"); err != nil {
 		t.Fatal(err)
 	}
 
 	h.Close()
 
-	os.RemoveAll(path)
+	if err := os.RemoveAll(path); err != nil {
+		fmt.Println(err)
+	}
 }

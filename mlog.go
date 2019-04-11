@@ -64,7 +64,9 @@ type RotatingFileHandler struct {
 // NewRotatingFileHandler creates dirs and opens the logfile
 func NewRotatingFileHandler(fileName string, maxBytes int, backupCount int) (*RotatingFileHandler, error) {
 	dir := path.Dir(fileName)
-	os.Mkdir(dir, 0777)
+
+	//ignore mkdir error
+	_ = os.Mkdir(dir, 0777)
 
 	h := new(RotatingFileHandler)
 
@@ -119,23 +121,30 @@ func (h *RotatingFileHandler) doRollover() {
 			sfn := fmt.Sprintf("%s.%d", h.fileName, i)
 			dfn := fmt.Sprintf("%s.%d", h.fileName, i+1)
 
-			os.Rename(sfn, dfn)
+			if err = os.Rename(sfn, dfn); err != nil {
+				log.Println(err)
+				return
+			}
 		}
 
 		dfn := fmt.Sprintf("%s.1", h.fileName)
-		os.Rename(h.fileName, dfn)
+		if err = os.Rename(h.fileName, dfn); err != nil {
+			log.Println(err)
+			return
+		}
 
 		h.fd, _ = os.OpenFile(h.fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	}
 }
 
-// Start starts the logging
+// Start starts the logging,use default maxBytes and backupCount,without multWrite
 func Start(level LogLevel, path string) {
-	doLogging(level, path, MaxBytes, BackupCount)
+	doLogging(level, path, MaxBytes, BackupCount, false)
 }
 
-func StartEx(level LogLevel, path string, maxBytes, backupCount int) {
-	doLogging(level, path, maxBytes, backupCount)
+// StartEx begin loggin with more options
+func StartEx(level LogLevel, path string, maxBytes, backupCount int, multWrite bool) {
+	doLogging(level, path, maxBytes, backupCount, multWrite)
 }
 
 // Stop stops the logging
@@ -152,11 +161,13 @@ func Stop() error {
 //of recently written data to disk.
 func Sync() {
 	if Logger.LogFile != nil {
-		Logger.LogFile.fd.Sync()
+		if err := Logger.LogFile.fd.Sync(); err != nil {
+			log.Println(err)
+		}
 	}
 }
 
-func doLogging(logLevel LogLevel, fileName string, maxBytes, backupCount int) {
+func doLogging(logLevel LogLevel, fileName string, maxBytes, backupCount int, multWrite bool) {
 	traceHandle := ioutil.Discard
 	infoHandle := ioutil.Discard
 	warnHandle := ioutil.Discard
@@ -188,23 +199,43 @@ func doLogging(logLevel LogLevel, fileName string, maxBytes, backupCount int) {
 		}
 
 		if traceHandle == os.Stdout {
-			traceHandle = io.MultiWriter(fileHandle, traceHandle)
+			if multWrite {
+				traceHandle = io.MultiWriter(fileHandle, traceHandle)
+			} else {
+				traceHandle = fileHandle
+			}
 		}
 
 		if infoHandle == os.Stdout {
-			infoHandle = io.MultiWriter(fileHandle, infoHandle)
+			if multWrite {
+				infoHandle = io.MultiWriter(fileHandle, infoHandle)
+			} else {
+				infoHandle = fileHandle
+			}
 		}
 
 		if warnHandle == os.Stdout {
-			warnHandle = io.MultiWriter(fileHandle, warnHandle)
+			if multWrite {
+				warnHandle = io.MultiWriter(fileHandle, warnHandle)
+			} else {
+				warnHandle = fileHandle
+			}
 		}
 
 		if errorHandle == os.Stderr {
-			errorHandle = io.MultiWriter(fileHandle, errorHandle)
+			if multWrite {
+				errorHandle = io.MultiWriter(fileHandle, errorHandle)
+			} else {
+				errorHandle = fileHandle
+			}
 		}
 
 		if fatalHandle == os.Stderr {
-			fatalHandle = io.MultiWriter(fileHandle, fatalHandle)
+			if multWrite {
+				fatalHandle = io.MultiWriter(fileHandle, fatalHandle)
+			} else {
+				fatalHandle = fileHandle
+			}
 		}
 	}
 
@@ -224,34 +255,44 @@ func doLogging(logLevel LogLevel, fileName string, maxBytes, backupCount int) {
 
 // Trace writes to the Trace destination
 func Trace(format string, a ...interface{}) {
-	Logger.Trace.Output(2, fmt.Sprintf(format, a...))
+	if err := Logger.Trace.Output(2, fmt.Sprintf(format, a...)); err != nil {
+		fmt.Println(err)
+	}
 }
 
 //** INFO
 
 // Info writes to the Info destination
 func Info(format string, a ...interface{}) {
-	Logger.Info.Output(2, fmt.Sprintf(format, a...))
+	if err := Logger.Info.Output(2, fmt.Sprintf(format, a...)); err != nil {
+		fmt.Println(err)
+	}
 }
 
 //** WARNING
 
 // Warning writes to the Warning destination
 func Warning(format string, a ...interface{}) {
-	Logger.Warning.Output(2, fmt.Sprintf(format, a...))
+	if err := Logger.Warning.Output(2, fmt.Sprintf(format, a...)); err != nil {
+		fmt.Println(err)
+	}
 }
 
 //** ERROR
 
 // Error writes to the Error destination and accepts an err
 func Error(err error) {
-	Logger.Error.Output(2, fmt.Sprintf("%s\n", err))
+	if err := Logger.Error.Output(2, fmt.Sprintf("%s\n", err)); err != nil {
+		fmt.Println(err)
+	}
 }
 
 // IfError is a shortcut function for log.Error if error
 func IfError(err error) {
 	if err != nil {
-		Logger.Error.Output(2, fmt.Sprintf("%s\n", err))
+		if errWrite := Logger.Error.Output(2, fmt.Sprintf("%s\n", err)); errWrite != nil {
+			fmt.Println(errWrite)
+		}
 	}
 }
 
@@ -259,14 +300,18 @@ func IfError(err error) {
 
 // Fatal writes to the Fatal destination and exits with an error 255 code
 func Fatal(a ...interface{}) {
-	Logger.Fatal.Output(2, fmt.Sprint(a...))
+	if err := Logger.Fatal.Output(2, fmt.Sprint(a...)); err != nil {
+		fmt.Println(err)
+	}
 	Sync()
 	os.Exit(255)
 }
 
 // Fatalf writes to the Fatal destination and exits with an error 255 code
 func Fatalf(format string, a ...interface{}) {
-	Logger.Fatal.Output(2, fmt.Sprintf(format, a...))
+	if err := Logger.Fatal.Output(2, fmt.Sprintf(format, a...)); err != nil {
+		fmt.Println(err)
+	}
 	Sync()
 	os.Exit(255)
 }
@@ -275,7 +320,9 @@ func Fatalf(format string, a ...interface{}) {
 // exits with an error 255 code
 func FatalIfError(err error) {
 	if err != nil {
-		Logger.Fatal.Output(2, fmt.Sprintf("%s\n", err))
+		if errWrite := Logger.Fatal.Output(2, fmt.Sprintf("%s\n", err)); errWrite != nil {
+			fmt.Println(errWrite)
+		}
 		Sync()
 		os.Exit(255)
 	}
