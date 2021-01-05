@@ -129,7 +129,6 @@ func (h *RotatingFileHandler) doRollover() {
 		dfn := fmt.Sprintf("%s.1", h.fileName)
 		if err = os.Rename(h.fileName, dfn); err != nil {
 			log.Println(err)
-			return
 		}
 
 		h.fd, _ = os.OpenFile(h.fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
