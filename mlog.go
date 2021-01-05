@@ -123,7 +123,6 @@ func (h *RotatingFileHandler) doRollover() {
 
 			if err = os.Rename(sfn, dfn); err != nil {
 				log.Println(err)
-				return
 			}
 		}
 
